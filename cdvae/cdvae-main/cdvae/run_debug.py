@@ -1,6 +1,8 @@
+
 import warnings
 warnings.filterwarnings("ignore", message="Issues encountered while parsing CIF")
 
+import os
 from pathlib import Path
 from typing import List
 
@@ -21,6 +23,10 @@ from pytorch_lightning.loggers import WandbLogger
 
 from cdvae.common.utils import log_hyperparameters, PROJECT_ROOT
 
+# Hydra debugger-safe setup
+os.environ["HYDRA_FULL_ERROR"] = "1"
+os.environ["HYDRA_RUN_DIR"] = os.getcwd()
+os.environ["PROJECT_ROOT"] = "/home/jamshid/workspace/nima/cdvae/cdvae-main"
 
 def build_callbacks(cfg: DictConfig) -> List[Callback]:
     callbacks: List[Callback] = []
@@ -61,73 +67,27 @@ def build_callbacks(cfg: DictConfig) -> List[Callback]:
 
 
 def run(cfg: DictConfig) -> None:
-    """
-    Debug run with MP-20 dataset using specified Hydra jobs directory
-    """
-    # Force debug settings
-    cfg.train.deterministic = True
-    cfg.train.random_seed = 42
-    
-    # MP-20 specific data settings
-    cfg.data.datamodule._target_ = "cdvae.data.datamodule.CrystDataModule"
-    cfg.data.datamodule.name = "mp_20"
-    cfg.data.datamodule.batch_size = 4
-    cfg.data.datamodule.num_workers.train = 0
-    cfg.data.datamodule.num_workers.val = 0
-    cfg.data.datamodule.num_workers.test = 0
-    cfg.data.prop = "formation_energy_per_atom"
-    cfg.data.root = "/home/jamshid/workspace/nima/cdvae/hydra/singlerun/2025-04-08/pace_mp_20_v1/data/mp_20/"
-    
-    # Debug settings for trainer
-    cfg.train.pl_trainer.fast_dev_run = False  # Run full training
-    cfg.train.pl_trainer.gpus = 1  # Use GPU
-    cfg.train.pl_trainer.max_epochs = 2
-    cfg.train.pl_trainer.limit_train_batches = 2
-    cfg.train.pl_trainer.limit_val_batches = 2
-    cfg.train.pl_trainer.limit_test_batches = 2
-    
-    # Model specific debug settings for MP-20
-    cfg.model._target_ = "cdvae.pl_modules.model.CDVAE"
-    cfg.model.hidden_dim = 64
-    cfg.model.latent_dim = 32
-    cfg.model.max_atoms = 20  # MP-20 specific
-    cfg.model.num_noise_level = 10
-    cfg.model.encoder._target_ = "cdvae.pl_modules.gnn.DimeNetPlusPlusWrap"
-    cfg.model.decoder._target_ = "cdvae.pl_modules.decoder.GemNetTDecoder"
-    
-    # Optimization debug settings
-    cfg.optim.optimizer.lr = 0.001
-    cfg.optim.use_lr_scheduler = False
-    
-    # Turn off wandb logging for debugging
-    cfg.logging.wandb.mode = "disabled"
-    
-    # Set Hydra output directory
-    hydra_dir = Path("/home/jamshid/workspace/nima/cdvae/hydra/singlerun/2025-04-08/pace_mp_20_v1")
-    
-    # Print debug configuration
-    hydra.utils.log.info("\n=== Debug Configuration for MP-20 ===")
-    hydra.utils.log.info(f"Dataset: MP-20")
-    hydra.utils.log.info(f"Data path: {cfg.data.root}")
-    hydra.utils.log.info(f"Hydra dir: {hydra_dir}")
-    hydra.utils.log.info(f"Batch size: {cfg.data.datamodule.batch_size}")
-    hydra.utils.log.info(f"Max epochs: {cfg.train.pl_trainer.max_epochs}")
-    hydra.utils.log.info("=======================\n")
-
-    # Rest of the original run function
     if cfg.train.deterministic:
         seed_everything(cfg.train.random_seed)
 
-    # Hydra run directory
+    if cfg.train.pl_trainer.fast_dev_run:
+        hydra.utils.log.info(
+            f"Debug mode <{cfg.train.pl_trainer.fast_dev_run=}>. "
+            f"Forcing debugger friendly configuration!"
+        )
+        cfg.train.pl_trainer.gpus = 0
+        cfg.data.datamodule.num_workers.train = 0
+        cfg.data.datamodule.num_workers.val = 0
+        cfg.data.datamodule.num_workers.test = 0
+        cfg.logging.wandb.mode = "offline"
+
     hydra_dir = Path(HydraConfig.get().run.dir)
 
-    # Instantiate datamodule
     hydra.utils.log.info(f"Instantiating <{cfg.data.datamodule._target_}>")
     datamodule: pl.LightningDataModule = hydra.utils.instantiate(
         cfg.data.datamodule, _recursive_=False
     )
 
-    # Instantiate model
     hydra.utils.log.info(f"Instantiating <{cfg.model._target_}>")
     model: pl.LightningModule = hydra.utils.instantiate(
         cfg.model,
@@ -137,16 +97,14 @@ def run(cfg: DictConfig) -> None:
         _recursive_=False,
     )
 
-    # Pass scaler from datamodule to model
     hydra.utils.log.info(f"Passing scaler from datamodule to model <{datamodule.scaler}>")
     model.lattice_scaler = datamodule.lattice_scaler.copy()
     model.scaler = datamodule.scaler.copy()
     torch.save(datamodule.lattice_scaler, hydra_dir / 'lattice_scaler.pt')
     torch.save(datamodule.scaler, hydra_dir / 'prop_scaler.pt')
-    # Instantiate the callbacks
+
     callbacks: List[Callback] = build_callbacks(cfg=cfg)
 
-    # Logger instantiation/configuration
     wandb_logger = None
     if "wandb" in cfg.logging:
         hydra.utils.log.info("Instantiating <WandbLogger>")
@@ -162,11 +120,9 @@ def run(cfg: DictConfig) -> None:
             log_freq=cfg.logging.wandb_watch.log_freq,
         )
 
-    # Store the YaML config separately into the wandb dir
     yaml_conf: str = OmegaConf.to_yaml(cfg=cfg)
     (hydra_dir / "hparams.yaml").write_text(yaml_conf)
 
-    # Load checkpoint (if exist)
     ckpts = list(hydra_dir.glob('*.ckpt'))
     if len(ckpts) > 0:
         ckpt_epochs = np.array([int(ckpt.parts[-1].split('-')[0].split('=')[1]) for ckpt in ckpts])
@@ -174,7 +130,7 @@ def run(cfg: DictConfig) -> None:
         hydra.utils.log.info(f"found checkpoint: {ckpt}")
     else:
         ckpt = None
-          
+
     hydra.utils.log.info("Instantiating the Trainer")
     trainer = pl.Trainer(
         default_root_dir=hydra_dir,
@@ -194,15 +150,15 @@ def run(cfg: DictConfig) -> None:
     hydra.utils.log.info("Starting testing!")
     trainer.test(datamodule=datamodule)
 
-    # Logger closing to release resources/avoid multi-run conflicts
     if wandb_logger is not None:
         wandb_logger.experiment.finish()
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+# @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main("/home/jamshid/workspace/nima/cdvae/cdvae-main/conf", config_name="default")
 def main(cfg: omegaconf.DictConfig):
+    os.chdir(os.environ["HYDRA_RUN_DIR"])  # debugger-safe fix
     run(cfg)
-
 
 if __name__ == "__main__":
     main()

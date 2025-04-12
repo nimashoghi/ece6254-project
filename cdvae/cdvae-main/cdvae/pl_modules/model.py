@@ -134,7 +134,7 @@ class CrystGNN_Supervise(BaseModule):
 
 
 class CDVAE(BaseModule):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:      
         super().__init__(*args, **kwargs)
 
         self.encoder = hydra.utils.instantiate(

@@ -225,3 +225,4 @@ wabdb
 wabdb/*
 *.pt 
 *.ckpt
+debugged_outputs/
