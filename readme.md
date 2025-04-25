@@ -1,7 +1,7 @@
 # Crystal Diffusion Variational AutoEncoder
 
-<p align="cdvae/cdvae-main/center">
-  <img src="assets/arch.png" /> 
+<p align="center">
+  <img src="cdvae/cdvae-main/assets/arch.png" /> 
 </p>
 
 
