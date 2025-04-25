@@ -10,7 +10,7 @@ This is unofficial implementation of the paper: [[Paper]](https://arxiv.org/abs/
 ## Installation (GPU)
 In case you are using old PyTorch versions (1.X.X), follow the official setups. For new versions after settuping [conda](https://conda.io/docs/index.html):
 ```bash
-cd cdvae/cdvae-main
+cd cdvae-main
 conda env create -f env.yml
 ```
 ### Setting up environment variables
