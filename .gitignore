@@ -226,3 +226,15 @@ wabdb/*
 *.pt 
 *.ckpt
 debugged_outputs/
+.md 
+/home/jamshid/workspace/nima/cdvae/cdvae-main/conf/debug_default.yaml 
+/home/jamshid/workspace/nima/slides_update_jamshid.md
+/home/jamshid/workspace/nima/cdvae/cdvae-main/scripts/compute_metrics_debug.py
+/home/jamshid/workspace/nima/cdvae/cdvae-main/scripts/compute_metrics_backup.py
+/home/jamshid/workspace/nima/cdvae/cdvae-main/scripts/evaluate.ipynb
+/home/jamshid/workspace/nima/cdvae/cdvae-main/scripts/evaluate_copilot.py
+/home/jamshid/workspace/nima/cdvae/cdvae-main/scripts/evaluate.ipynb
+/home/jamshid/workspace/hw6
+/home/jamshid/workspace/nima/cdvae/wabdb
+/home/jamshid/workspace/nima/cdvae/hydra
+/home/jamshid/workspace/nima/trail.ipynb

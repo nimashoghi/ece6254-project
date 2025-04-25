@@ -52,9 +52,9 @@ data:
       val: 0
       test: 0
     batch_size:
-      train: 256
-      val: 256
-      test: 256
+      train: 1024
+      val: 1024
+      test: 1024
 logging:
   val_check_interval: 5
   progress_bar_refresh_rate: 20
@@ -95,6 +95,8 @@ model:
   hidden_dim: 128
   fc_num_layers: 4
   use_pe: false
+  optimize_latent_property: true
+  cost_property_latent: 1.0 
 optim:
   optimizer:
     _target_: torch.optim.Adam

@@ -83,6 +83,149 @@ def reconstructon(loader, model, ld_kwargs, num_evals,
         all_frac_coords_stack, all_atom_types_stack, input_data_batch)
 
 
+
+
+def initialize_latent_conditioned_on_composition(
+    batch,  # data object that includes the ground truth
+    model,  # VAE
+    max_steps=20000,
+    lr=1e-4,
+) -> torch.Tensor:
+    z = torch.randn(
+        (batch.num_graphs, model.hparams.hidden_dim),
+        device=model.device,
+        requires_grad=True,
+    )
+    opt = Adam([z], lr=lr)
+    model.freeze()
+
+    for i in tqdm(range(max_steps)):
+        opt.zero_grad()
+
+        (
+            pred_num_atoms,
+            pred_lengths_and_angles,
+            pred_lengths,
+            pred_angles,
+            pred_composition_per_atom,
+        ) = model.decode_stats(z, batch.num_atoms, None, None, teacher_forcing=True)
+        loss = model.composition_loss(
+            pred_composition_per_atom, batch.atom_types, batch
+        )
+        print(f"loss: {loss.item()}")
+        
+        loss.backward()
+       
+        opt.step()
+
+
+    return z.detach().requires_grad_(False).clone()
+
+
+def reconstructon_ours(
+    loader,
+    model,
+    ld_kwargs,
+    num_evals,
+    force_num_atoms=False,
+    force_atom_types=False,
+    down_sample_traj_step=1,
+):
+    """
+    reconstruct the crystals in <loader>.
+    """
+    all_frac_coords_stack = []
+    all_atom_types_stack = []
+    frac_coords = []
+    num_atoms = []
+    atom_types = []
+    lengths = []
+    angles = []
+    input_data_list = []
+
+    for idx, batch in enumerate(loader):
+        if torch.cuda.is_available():
+            batch.cuda()
+        print(f"batch {idx} in {len(loader)}")
+        batch_all_frac_coords = []
+        batch_all_atom_types = []
+        batch_frac_coords, batch_num_atoms, batch_atom_types = [], [], []
+        batch_lengths, batch_angles = [], []
+
+        # only sample one z, multiple evals for stoichaticity in langevin dynamics
+        z = initialize_latent_conditioned_on_composition(batch, model)
+
+        for eval_idx in range(num_evals):
+            gt_num_atoms = batch.num_atoms if force_num_atoms else None
+            gt_atom_types = batch.atom_types if force_atom_types else None
+            outputs = model.langevin_dynamics(z, ld_kwargs, gt_num_atoms, gt_atom_types)
+
+            # collect sampled crystals in this batch.
+            batch_frac_coords.append(outputs["frac_coords"].detach().cpu())
+            batch_num_atoms.append(outputs["num_atoms"].detach().cpu())
+            batch_atom_types.append(outputs["atom_types"].detach().cpu())
+            batch_lengths.append(outputs["lengths"].detach().cpu())
+            batch_angles.append(outputs["angles"].detach().cpu())
+            if ld_kwargs.save_traj:
+                batch_all_frac_coords.append(
+                    outputs["all_frac_coords"][::down_sample_traj_step].detach().cpu()
+                )
+                batch_all_atom_types.append(
+                    outputs["all_atom_types"][::down_sample_traj_step].detach().cpu()
+                )
+        # collect sampled crystals for this z.
+        frac_coords.append(torch.stack(batch_frac_coords, dim=0))
+        num_atoms.append(torch.stack(batch_num_atoms, dim=0))
+        atom_types.append(torch.stack(batch_atom_types, dim=0))
+        lengths.append(torch.stack(batch_lengths, dim=0))
+        angles.append(torch.stack(batch_angles, dim=0))
+        if ld_kwargs.save_traj:
+            all_frac_coords_stack.append(torch.stack(batch_all_frac_coords, dim=0))
+            all_atom_types_stack.append(torch.stack(batch_all_atom_types, dim=0))
+        # Save the ground truth structure
+        input_data_list = input_data_list + batch.to_data_list()
+
+    frac_coords = torch.cat(frac_coords, dim=1)
+    num_atoms = torch.cat(num_atoms, dim=1)
+    atom_types = torch.cat(atom_types, dim=1)
+    lengths = torch.cat(lengths, dim=1)
+    angles = torch.cat(angles, dim=1)
+    if ld_kwargs.save_traj:
+        all_frac_coords_stack = torch.cat(all_frac_coords_stack, dim=2)
+        all_atom_types_stack = torch.cat(all_atom_types_stack, dim=2)
+    input_data_batch = Batch.from_data_list(input_data_list)
+
+    return (
+        frac_coords,
+        num_atoms,
+        atom_types,
+        lengths,
+        angles,
+        all_frac_coords_stack,
+        all_atom_types_stack,
+        input_data_batch,
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def generation(model, ld_kwargs, num_batches_to_sample, num_samples_per_z,
                batch_size=2048, down_sample_traj_step=1):
     all_frac_coords_stack = []
@@ -157,6 +300,7 @@ def optimization(model, ld_kwargs, data_loader,
     opt = Adam([z], lr=lr)
     model.freeze()
 
+
     all_crystals = []
     interval = num_gradient_steps // (num_saved_crys-1)
     for i in tqdm(range(num_gradient_steps)):
@@ -199,6 +343,32 @@ def main(args):
             recon_out_name = 'eval_recon.pt'
         else:
             recon_out_name = f'eval_recon_{args.label}.pt'
+
+        torch.save({
+            'eval_setting': args,
+            'input_data_batch': input_data_batch,
+            'frac_coords': frac_coords,
+            'num_atoms': num_atoms,
+            'atom_types': atom_types,
+            'lengths': lengths,
+            'angles': angles,
+            'all_frac_coords_stack': all_frac_coords_stack,
+            'all_atom_types_stack': all_atom_types_stack,
+            'time': time.time() - start_time
+        }, model_path / recon_out_name)
+
+    if 'recon_conditional' in args.tasks:
+        print('Evaluate model on the conditional reconstruction task.')
+        start_time = time.time()
+        (frac_coords, num_atoms, atom_types, lengths, angles,
+         all_frac_coords_stack, all_atom_types_stack, input_data_batch) = reconstructon_ours(
+            test_loader, model, ld_kwargs, args.num_evals,
+            args.force_num_atoms, args.force_atom_types, args.down_sample_traj_step)
+
+        if args.label == '':
+            recon_out_name = 'eval_recon_conditional.pt'
+        else:
+            recon_out_name = f'eval_recon_conditional_{args.label}.pt'
 
         torch.save({
             'eval_setting': args,

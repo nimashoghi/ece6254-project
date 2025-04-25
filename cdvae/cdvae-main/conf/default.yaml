@@ -8,7 +8,7 @@ core:
 
 hydra:
   run:
-    dir: ./debugged_outputs
+    dir: ${oc.env:HYDRA_JOBS}/singlerun/${now:%Y-%m-%d}/${expname}/
 
   sweep:
     dir: ${oc.env:HYDRA_JOBS}/multirun/${now:%Y-%m-%d}/${expname}/
@@ -17,7 +17,7 @@ hydra:
   job:
     env_set:
       WANDB_START_METHOD: thread
-      WANDB_DIR: ./wandb_debugged
+      WANDB_DIR: ${oc.env:WABDB_DIR}
 
 defaults:
   - data: default
