@@ -28,13 +28,13 @@ python cdvae/run.py data=perov expname=perov
 
 ## De novo Generation
 ```
-python scripts/evaluate.py --model_path MODEL_PATH --tasks recon gen opt
+python scripts/evaluate.py --model_path MODEL_PATH --tasks gen
 ```
 
 ## Conditional Crystal Prediction
 
 ```
-python scripts/evaluate.py --model_path MODEL_PATH --tasks recon_conditional gen opt
+python scripts/evaluate.py --model_path MODEL_PATH --tasks recon_conditional
 ```
 
 ## Evaluation
