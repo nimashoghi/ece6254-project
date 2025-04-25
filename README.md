@@ -9,3 +9,4 @@ This repository contains scripts for analyzing and visualizing embeddings from d
 - `umap_scripts/`: Directory containing scripts for embedding conversion, dimensionality reduction, and visualization. See the [UMAP Scripts README](umap_scripts/README.md) for detailed documentation on these scripts
 - `flowmm/`: Directory with FlowMM model implementation and documentation, see [FlowMM README](flowmm/README.md) for details
 - `crystal-text-llm/`: Directory with Crystal Text LLM model implementation and documentation, see [Crystal Text LLM README](crystal-text-llm/README.md) for details
+- `cdvae/`: Directory with CDVAE model implementation and documentation, see [CDVAE README](cdvae/README.md) for details
