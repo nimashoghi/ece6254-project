@@ -1,6 +1,6 @@
 # Crystal Diffusion Variational AutoEncoder
 
-<p align="center">
+<p align="cdvae/cdvae-main/center">
   <img src="assets/arch.png" /> 
 </p>
 
@@ -8,7 +8,7 @@
 This is unofficial implementation of the paper: [[Paper]](https://arxiv.org/abs/2110.06197) with minor changes. You may find the original implementation [here](https://github.com/txie-93/cdvae).
 
 ## Installation (GPU)
-In case you are using old PyTorch versions, follow the official setups. For new versions after settuping [conda](https://conda.io/docs/index.html):
+In case you are using old PyTorch versions (1.X.X), follow the official setups. For new versions after settuping [conda](https://conda.io/docs/index.html):
 ```bash
 cd cdvae/cdvae-main
 conda env create -f env.yml
