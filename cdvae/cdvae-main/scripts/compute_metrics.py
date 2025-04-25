@@ -374,6 +374,17 @@ def main(args):
         rec_evaluator = RecEval(pred_crys, gt_crys)
         recon_metrics = rec_evaluator.get_metrics()
         all_metrics.update(recon_metrics)
+    
+    if 'recon' in args.tasks:
+        recon_file_path = get_file_paths(args.root_path, 'recon_conditional', args.label)
+        crys_array_list, true_crystal_array_list = get_crystal_array_list(
+            recon_file_path)
+        pred_crys = p_map(lambda x: Crystal(x), crys_array_list)
+        gt_crys = p_map(lambda x: Crystal(x), true_crystal_array_list)
+
+        rec_evaluator = RecEval(pred_crys, gt_crys)
+        recon_metrics = rec_evaluator.get_metrics()
+        all_metrics.update(recon_metrics)
 
     if 'gen' in args.tasks:
         gen_file_path = get_file_paths(args.root_path, 'gen', args.label)

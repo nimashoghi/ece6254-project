@@ -41,7 +41,7 @@ python scripts/evaluate.py --model_path MODEL_PATH --tasks recon_conditional
 Having the checkpoint setup, 
 
 ```
-python scripts/compute_metrics.py --root_path MODEL_PATH --tasks recon gen opt
+python scripts/compute_metrics.py --root_path MODEL_PATH --tasks recon_conditional gen
 ```
 ## Citation
 Please cite the original paper if found something useful.
